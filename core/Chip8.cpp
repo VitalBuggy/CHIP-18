@@ -28,7 +28,21 @@ public:
     void OP_00EE(); // RET
     void OP_1nnn(); // JP addr
     void OP_2nnn(); // CALL addr
-    void OP_3xkk(); // CALL addr
+    void OP_3xkk(); // SE Vx, byte
+    void OP_4xkk(); // SNE Vx, byte
+    void OP_5xy0(); // SE Vx, Vy
+    void OP_6xkk(); // LD Vx, byte
+    void OP_7xkk(); // ADD Vx, byte
+    void OP_8xy0(); // LD Vx, Vy
+    void OP_8xy1(); // OR Vx, Vy
+    void OP_8xy2(); // AND Vx, Vy
+    void OP_8xy3(); // XOR Vx, Vy
+    void OP_8xy4(); // ADD Vx, Vy
+    void OP_8xy5(); // SUB Vx  {, Vy}
+    void OP_8xy6(); // SHR Vx, Vy
+    void OP_8xy7(); // SUBN Vx, Vy
+    void OP_8xyE(); // SHL Vx {, Vy}
+    void OP_9xy0(); // SNE Vx, Vy
     Chip8();
 };
 
@@ -79,14 +93,14 @@ void Chip8::OP_00EE()
 
 void Chip8::OP_1nnn()
 {
-    uint8_t addr = this->opcode & 0x0FFFu;
+    uint16_t addr = this->opcode & 0x0FFFu;
 
     this->pc = addr;
 }
 
 void Chip8::OP_2nnn()
 {
-    uint8_t addr = this->opcode & 0x0FFFu;
+    uint16_t addr = this->opcode & 0x0FFFu;
 
     this->stack[this->sp] = this->pc;
     this->sp++;
@@ -97,10 +111,145 @@ void Chip8::OP_2nnn()
 void Chip8::OP_3xkk()
 {
     uint8_t reg = (this->opcode & 0x0F00u) >> 8u;
-    uint16_t data = this->opcode & 0x00FF;
+    uint8_t data = this->opcode & 0x00FF;
 
     if (this->registers[reg] == data)
     {
         this->pc += 2;
     }
 }
+
+void Chip8::OP_4xkk()
+{
+    uint8_t reg = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t data = this->opcode & 0x00FF;
+
+    if (this->registers[reg] != data)
+    {
+        this->pc += 2;
+    }
+}
+
+void Chip8::OP_5xy0()
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    if (this->registers[r1] == this->registers[r2])
+    {
+        this->pc += 2;
+    }
+}
+
+void Chip8::OP_6xkk()
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t data = this->opcode & 0x00FFu;
+
+    this->registers[r1] = data;
+}
+
+void Chip8::OP_7xkk()
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t data = this->opcode & 0x00FFu;
+
+    this->registers[r1] += data;
+}
+
+void Chip8::OP_8xy0()
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    this->registers[r1] = this->registers[r2];
+}
+
+void Chip8::OP_8xy1()
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    this->registers[r1] |= this->registers[r2];
+}
+
+void Chip8::OP_8xy2() // AND Vx, Vy
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    this->registers[r1] &= this->registers[r2];
+}
+
+void Chip8::OP_8xy3() // XOR Vx, Vy
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    this->registers[r1] ^= this->registers[r2];
+}
+
+void Chip8::OP_8xy4() // ADD Vx, Vy
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    uint16_t sum = this->registers[r1] + this->registers[r2];
+
+    this->registers[0xF] = (sum > 255U ? 1 : 0);
+
+    this->registers[r1] = sum & 0xFFu;
+}
+
+void Chip8::OP_8xy5() // SUB Vx  {, Vy}
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    this->registers[0xF] = (this->registers[r1] > this->registers[r2] ? 1 : 0);
+
+    this->registers[r1] -= this->registers[r2];
+}
+
+void Chip8::OP_8xy6() // SHR Vx, Vy
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    // Set value of VF to the least significant bit of Vy before bit shift and movement to Vx
+    this->registers[0xF] = this->registers[r2] & 0x1u;
+
+    // Store the value of Vy shifted to the right by 1 in Vx
+    this->registers[r1] = this->registers[r2] >> 1;
+}
+
+void Chip8::OP_8xy7() // SUBN Vx, Vy
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u; // Vx
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u; // Vy
+
+    this->registers[0xF] = (this->registers[r1] > this->registers[r2] ? 0 : 1);
+
+    this->registers[r1] = this->registers[r2] - this->registers[r1];
+}
+
+void Chip8::OP_8xyE() // SHL Vx {, Vy}
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    // Set value of VF to the most significant bit of Vy before bit shift and movement to Vx
+    this->registers[0xF] = (this->registers[r2] & 0x80u) >> 7u;
+
+    // Store the value of Vy shifted to the right by 1 in Vx
+    this->registers[r1] = this->registers[r2] << 1;
+}
+
+void Chip8::OP_9xy0() // SNE Vx, Vy
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
+
+    if (this->registers[r1] != this->registers[r2]) this->pc += 2;
+}
+
