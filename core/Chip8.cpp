@@ -1,5 +1,7 @@
 #include <cstdint>
 #include <fstream>
+#include <iostream>
+#include <cstring>
 #include "FontSet.hpp"
 
 #define START_ADDRESS 0x200
@@ -21,6 +23,12 @@ public:
     uint16_t opcode;
 
     void LoadROM(char const *filename);
+
+    void OP_00E0(); // CLS
+    void OP_00EE(); // RET
+    void OP_1nnn(); // JP addr
+    void OP_2nnn(); // CALL addr
+    void OP_3xkk(); // CALL addr
     Chip8();
 };
 
@@ -55,5 +63,44 @@ void Chip8::LoadROM(char const *filename)
         }
 
         delete[] buffer;
+    }
+}
+
+void Chip8::OP_00E0()
+{
+    std::memset(this->display, 0, sizeof(this->display));
+}
+
+void Chip8::OP_00EE()
+{
+    this->sp--;
+    this->pc = this->stack[this->sp];
+}
+
+void Chip8::OP_1nnn()
+{
+    uint8_t addr = this->opcode & 0x0FFFu;
+
+    this->pc = addr;
+}
+
+void Chip8::OP_2nnn()
+{
+    uint8_t addr = this->opcode & 0x0FFFu;
+
+    this->stack[this->sp] = this->pc;
+    this->sp++;
+
+    this->pc = addr;
+}
+
+void Chip8::OP_3xkk()
+{
+    uint8_t reg = (this->opcode & 0x0F00u) >> 8u;
+    uint16_t data = this->opcode & 0x00FF;
+
+    if (this->registers[reg] == data)
+    {
+        this->pc += 2;
     }
 }
