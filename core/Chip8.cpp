@@ -1,11 +1,14 @@
 #include <cstdint>
 #include <fstream>
-#include <iostream>
 #include <cstring>
+#include <chrono>
+#include <random>
 #include "FontSet.hpp"
 
 #define START_ADDRESS 0x200
 #define FONT_SET_START_ADDRESS 0x50
+#define VIDEO_WIDTH 64
+#define VIDEO_HEIGHT 32
 
 class Chip8
 {
@@ -43,11 +46,25 @@ public:
     void OP_8xy7(); // SUBN Vx, Vy
     void OP_8xyE(); // SHL Vx {, Vy}
     void OP_9xy0(); // SNE Vx, Vy
+    void OP_Annn(); // LD I, addr
+    void OP_Bnnn(); // JP V0, addr
+    void OP_Cxnn(); // RND Vx, byte
+    void OP_Dxyn(); // DRW Vx, Vy, N
+    void OP_Ex9E(); // SKP Vx
+    void OP_ExA1(); // SKNP Vx
+    void OP_Fx07(); // LD Vx, DT
+    void OP_Fx0A(); // LD Vx, K
+
+    std::default_random_engine randGen;
+    std::uniform_int_distribution<uint8_t> randByte;
+
     Chip8();
 };
 
-Chip8::Chip8()
+Chip8::Chip8() : randGen(std::chrono::system_clock::now().time_since_epoch().count())
 {
+    randByte = std::uniform_int_distribution<uint8_t>(0, 255U);
+
     FontSet f;
 
     for (unsigned int i = 0; i < f.FONTSET_SIZE; i++)
@@ -250,6 +267,109 @@ void Chip8::OP_9xy0() // SNE Vx, Vy
     uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
     uint8_t r2 = (this->opcode & 0x00F0u) >> 4u;
 
-    if (this->registers[r1] != this->registers[r2]) this->pc += 2;
+    if (this->registers[r1] != this->registers[r2])
+        this->pc += 2;
 }
 
+void Chip8::OP_Annn()
+{
+    uint16_t addr = this->opcode & 0x0FFFu;
+    this->index = addr;
+}
+
+void Chip8::OP_Bnnn()
+{
+    uint16_t addr = this->opcode & 0x0FFFu;
+    this->pc = addr + this->registers[0];
+}
+
+void Chip8::OP_Cxnn()
+{
+    uint8_t r1 = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t mask = this->opcode & 0x00FFu;
+
+    this->registers[r1] = randByte(randGen) & mask;
+}
+
+void Chip8::OP_Dxyn()
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t Vy = (this->opcode & 0x00F0u) >> 4u;
+    uint8_t height = this->opcode & 0x000Fu;
+
+    uint8_t x = this->registers[Vx];
+    uint8_t y = this->registers[Vy];
+
+    this->registers[0xF] = 0;
+
+    for (unsigned int i = 0; i < height; i++)
+    {
+        uint8_t sprite_byte = this->memory[this->index + i];
+        for (unsigned int j = 0; j < 8; j++)
+        {
+            uint8_t spritePixel = sprite_byte & (0x80u >> j);
+            uint32_t *screenPixel = &display[(y + i) * VIDEO_WIDTH + (x + j)];
+
+            // Sprite pixel is on
+            if (spritePixel)
+            {
+                // Screen pixel also on - collision
+                if (*screenPixel == 0xFFFFFFFF)
+                {
+                    this->registers[0xF] = 1;
+                }
+
+                // Effectively XOR with the sprite pixel
+                *screenPixel ^= 0xFFFFFFFF;
+            }
+        }
+    }
+}
+
+void Chip8::OP_Ex9E()
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+
+    uint8_t key = this->registers[Vx];
+
+    if (this->keys[key])
+    {
+        pc += 2;
+    }
+}
+
+void Chip8::OP_ExA1()
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+
+    uint8_t key = this->registers[Vx];
+
+    if (!this->keys[key])
+    {
+        pc += 2;
+    }
+}
+
+void Chip8::OP_Fx07()
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+
+    this->registers[Vx] = this->dtimer;
+}
+
+void Chip8::OP_Fx0A()
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+
+    bool set = false;
+
+    for (int i = 0; i < 16; i++) {
+        if (this->keys[i]) { 
+            this->registers[Vx] = i;
+            set = true;
+            break;
+        }
+    }
+
+    if (!set) this->pc -= 2;
+}
