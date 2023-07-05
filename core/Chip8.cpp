@@ -54,6 +54,13 @@ public:
     void OP_ExA1(); // SKNP Vx
     void OP_Fx07(); // LD Vx, DT
     void OP_Fx0A(); // LD Vx, K
+    void OP_Fx15(); // LD DT, Vx
+    void OP_Fx18(); // LD ST, Vx
+    void OP_Fx1E(); // ADD I, Vx
+    void OP_Fx29(); // LD F, Vx
+    void OP_Fx33(); // LD B, Vx
+    void OP_Fx55(); // LD [I], Vx
+    void OP_Fx65(); // LD Vx, [I]
 
     std::default_random_engine randGen;
     std::uniform_int_distribution<uint8_t> randByte;
@@ -363,13 +370,79 @@ void Chip8::OP_Fx0A()
 
     bool set = false;
 
-    for (int i = 0; i < 16; i++) {
-        if (this->keys[i]) { 
+    for (int i = 0; i < 16; i++)
+    {
+        if (this->keys[i])
+        {
             this->registers[Vx] = i;
             set = true;
             break;
         }
     }
 
-    if (!set) this->pc -= 2;
+    if (!set)
+        this->pc -= 2;
+}
+
+void Chip8::OP_Fx15() // LD DT, Vx
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+
+    this->dtimer = this->registers[Vx];
+}
+
+void Chip8::OP_Fx18() // LD DT, Vx
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+
+    this->stimer = this->registers[Vx];
+}
+
+void Chip8::OP_Fx1E() // LD I, Vx
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+
+    this->index += this->registers[Vx];
+}
+
+void Chip8::OP_Fx29() // LD F, Vx
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t digit = this->registers[Vx];
+
+    this->index = FONT_SET_START_ADDRESS + (5 * digit);
+}
+
+void Chip8::OP_Fx33() // LD B, Vx
+{
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
+    uint8_t number = this->registers[Vx];
+
+    this->memory[this->index + 2] = number % 10;
+    number /= 10;
+
+    this->memory[this->index + 1] = number % 10;
+    number /= 10;
+
+    this->memory[this->index] = number % 10;
+}
+
+void Chip8::OP_Fx55() // LD [I], Vx
+{
+    uint8_t Vx = (this->opcode & 0X0F00u) >> 8u;
+
+    for (uint8_t i = 0; i <= Vx; i++)
+    {
+        this->memory[this->index + i] = this->registers[i];
+    }
+}
+
+void Chip8::OP_Fx65() // LD Vx, [I]
+{
+    uint8_t Vx = (this->opcode & 0X0F00u) >> 8u;
+
+    for (uint8_t i = 0; i <= Vx; i++)
+    {
+        this->registers[i] = this->memory[this->index + i];
+    }
 }
