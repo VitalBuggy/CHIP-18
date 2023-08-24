@@ -72,6 +72,8 @@ Chip8::Chip8() : randGen(std::chrono::system_clock::now().time_since_epoch().cou
 {
     randByte = std::uniform_int_distribution<uint8_t>(0, 255U);
 
+    // This is where we define the function pointer table
+
     FontSet f;
 
     for (unsigned int i = 0; i < f.FONTSET_SIZE; i++)
