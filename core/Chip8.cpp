@@ -458,6 +458,17 @@ void Chip8::Cycle() {
 
     // decode and execute - literally makes me sad
     switch (opcode & 0xF000u) {
+        case 0x0000:
+        switch ((opcode & 0x00FFu) << 8u) {
+            case 0xE000:
+            this->OP_00E0();
+            break;
+            case 0xEE00:
+            this->OP_00EE();
+            default:
+            std::cout << "bro why";
+        }
+        break;
         case 0x1000:
         this->OP_1nnn();
         break;
