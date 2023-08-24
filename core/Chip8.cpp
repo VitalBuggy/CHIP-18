@@ -4,6 +4,7 @@
 #include <chrono>
 #include <random>
 #include "FontSet.hpp"
+#include <iostream>
 
 #define START_ADDRESS 0x200
 #define FONT_SET_START_ADDRESS 0x50
@@ -26,6 +27,8 @@ public:
     uint16_t opcode;
 
     void LoadROM(char const *filename);
+
+    void Cycle();
 
     void OP_00E0(); // CLS
     void OP_00EE(); // RET
@@ -71,8 +74,6 @@ public:
 Chip8::Chip8() : randGen(std::chrono::system_clock::now().time_since_epoch().count())
 {
     randByte = std::uniform_int_distribution<uint8_t>(0, 255U);
-
-    // This is where we define the function pointer table
 
     FontSet f;
 
@@ -441,10 +442,136 @@ void Chip8::OP_Fx55() // LD [I], Vx
 
 void Chip8::OP_Fx65() // LD Vx, [I]
 {
-    uint8_t Vx = (this->opcode & 0X0F00u) >> 8u;
+    uint8_t Vx = (this->opcode & 0x0F00u) >> 8u;
 
     for (uint8_t i = 0; i <= Vx; i++)
     {
         this->registers[i] = this->memory[this->index + i];
     }
+}
+
+void Chip8::Cycle() {
+    // fetch instruction - literally merge 2 memory spaces - this makes me gag
+    this->opcode = (this->memory[pc] << 8u | this->memory[pc+1]);
+
+    this->pc += 2;
+
+    // decode and execute - literally makes me sad
+    switch (opcode & 0xF000u) {
+        case 0x1000:
+        this->OP_1nnn();
+        break;
+        case 0x2000:
+        this->OP_2nnn();
+        break;
+        case 0x3000:
+        this->OP_3xkk();
+        break;
+        case 0x4000:
+        this->OP_4xkk();
+        break;
+        case 0x5000:
+        this->OP_5xy0();
+        break;
+        case 0x6000:
+        this->OP_6xkk();
+        break;
+        case 0x7000:
+        this->OP_7xkk();
+        break;
+        case 0x8000:
+        switch ((opcode & 0x000F) << 12u) {
+            case 0x0000:
+            this->OP_8xy0();
+            break;
+            case 0x1000:
+            this->OP_8xy1();
+            break;
+            case 0x2000:
+            this->OP_8xy2();
+            break;
+            case 0x3000:
+            this->OP_8xy3();
+            break;
+            case 0x4000:
+            this->OP_8xy4();
+            break;
+            case 0x5000:
+            this->OP_8xy5();
+            break;
+            case 0x6000:
+            this->OP_8xy6();
+            break;
+            case 0x7000:
+            this->OP_8xy7();
+            break;
+            case 0xE000:
+            this->OP_8xyE();
+            default:
+            std::cout << "Why do you do this?";
+        }
+        break;
+        case 0x9000:
+        this->OP_9xy0();
+        break;
+        case 0xA000:
+        this->OP_Annn();
+        break;
+        case 0xB000:
+        this->OP_Bnnn();
+        break;
+        case 0xC000:
+        this->OP_Cxnn();
+        break;
+        case 0xD000:
+        this->OP_Dxyn();
+        break;
+        case 0xE000:
+        switch((this->opcode & 0x00FF) << 8u) {
+            case 0x9E00:
+            this->OP_Ex9E();
+            break;
+            case 0xA100:
+            this->OP_ExA1();
+            default:
+            std::cout << "are you braindead";
+        }
+        break;
+        case 0xF000:
+        switch((this->opcode & 0x00FF) << 8u) {
+            case 0x0700:
+            this->OP_Fx07();
+            break;
+            case 0x0A00:
+            this->OP_Fx0A();
+            break;
+            case 0x1500:
+            this->OP_Fx15();
+            break;
+            case 0x1800:
+            this->OP_Fx18();
+            break;
+            case 0x1E00:
+            this->OP_Fx1E();
+            break;
+            case 0x2900:
+            this->OP_Fx29();
+            break;
+            case 0x3300:
+            this->OP_Fx33();
+            break;
+            case 0x5500:
+            this->OP_Fx55();
+            break;
+            case 0x6500:
+            this->OP_Fx65();
+            default:
+            std::cout << "you have brain damage";
+        }
+        default:
+        std::cout << "what the hell is wrong with you";
+    }
+
+    if (this->dtimer > 0) --this->dtimer;
+    if (this->stimer > 0) --this->stimer;
 }
