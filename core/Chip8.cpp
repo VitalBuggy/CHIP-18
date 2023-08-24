@@ -27,6 +27,8 @@ public:
 
     void LoadROM(char const *filename);
 
+    void Cycle();
+
     void OP_00E0(); // CLS
     void OP_00EE(); // RET
     void OP_1nnn(); // JP addr
@@ -445,4 +447,9 @@ void Chip8::OP_Fx65() // LD Vx, [I]
     {
         this->registers[i] = this->memory[this->index + i];
     }
+}
+
+void Chip8::Cycle()
+{
+
 }
