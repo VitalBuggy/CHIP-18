@@ -1,3 +1,6 @@
+#ifndef CHIP8
+#define CHIP8
+
 #include <cstdint>
 #include <fstream>
 #include <cstring>
@@ -541,8 +544,10 @@ void Chip8::Cycle()
     this->pc += 2;
     
     // evil pointer hack
-    ((*this).*(this->table[(this->opcode & 0xf000u) >> 12u]))();
+    ((*this).*(this->table[(this->opcode & 0xF000u) >> 12u]))();
 
     if (this->dtimer > 0) --this->dtimer;
     if (this->stimer > 0) --this->stimer;
 }
+
+#endif
